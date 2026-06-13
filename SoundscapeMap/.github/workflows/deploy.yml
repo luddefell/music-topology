@@ -1,0 +1,62 @@
+name: Test and Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg16
+        env:
+          POSTGRES_USER: soundscape
+          POSTGRES_PASSWORD: soundscape
+          POSTGRES_DB: soundscape
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+      - name: Python syntax check
+        run: python -m compileall services/region/app
+
+  build-images:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder image build gate
+        run: echo "Build vote-service, region-service, and web images here."
+
+  deploy:
+    needs: build-images
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Manual approval deployment placeholder
+        run: echo "Run migrations, deploy staging, smoke test, then promote production."

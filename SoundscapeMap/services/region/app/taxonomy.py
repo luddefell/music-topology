@@ -1,0 +1,30 @@
+GENRES = [
+    "electronic",
+    "hiphop",
+    "rock",
+    "pop",
+    "jazz",
+    "classical",
+    "latin",
+    "country",
+    "rnb",
+    "folk",
+    "metal",
+    "world",
+]
+
+GENRE_COLORS = {
+    "electronic": "#8B5CF6",
+    "hiphop": "#F59E0B",
+    "rock": "#EF4444",
+    "pop": "#EC4899",
+    "jazz": "#3B82F6",
+    "classical": "#6B7280",
+    "latin": "#F97316",
+    "country": "#84CC16",
+    "rnb": "#A855F7",
+    "folk": "#78716C",
+    "metal": "#1F2937",
+    "world": "#10B981",
+    "mixed": "#7A6F64",
+}

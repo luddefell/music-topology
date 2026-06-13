@@ -1,0 +1,30 @@
+{
+  "title": "SoundscapeMap Cluster Quality",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Silhouette Score",
+      "targets": [
+        { "expr": "soundscape_cluster_silhouette_score" }
+      ],
+      "fieldConfig": { "defaults": { "min": 0, "max": 1 } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Noise Ratio",
+      "targets": [
+        { "expr": "soundscape_cluster_noise_ratio" }
+      ],
+      "fieldConfig": { "defaults": { "min": 0, "max": 1 } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Fit Duration",
+      "targets": [
+        { "expr": "soundscape_cluster_fit_duration_ms" }
+      ]
+    }
+  ]
+}

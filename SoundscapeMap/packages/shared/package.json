@@ -1,0 +1,16 @@
+{
+  "name": "@soundscapemap/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": "./src/index.js",
+    "./genres": "./src/genres.js",
+    "./weights": "./src/weights.js",
+    "./validation": "./src/validation.js"
+  },
+  "scripts": {
+    "build": "node --check src/index.js",
+    "lint": "node --check src/index.js && node --check src/genres.js && node --check src/weights.js && node --check src/validation.js"
+  }
+}

@@ -1,0 +1,10 @@
+pyproject.toml
+app/main.py
+app/pipeline.py
+app/settings.py
+app/taxonomy.py
+soundscapemap_region.egg-info/PKG-INFO
+soundscapemap_region.egg-info/SOURCES.txt
+soundscapemap_region.egg-info/dependency_links.txt
+soundscapemap_region.egg-info/requires.txt
+soundscapemap_region.egg-info/top_level.txt

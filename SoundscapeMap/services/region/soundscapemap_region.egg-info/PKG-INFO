@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: soundscapemap-region
+Version: 0.1.0
+Requires-Python: >=3.12
+Requires-Dist: fastapi>=0.111.0
+Requires-Dist: uvicorn>=0.30.1
+Requires-Dist: numpy>=1.26.4
+Requires-Dist: scikit-learn>=1.5.0
+Requires-Dist: hdbscan>=0.8.37
+Requires-Dist: h3>=4.1.0
+Requires-Dist: shapely>=2.0.4
+Requires-Dist: psycopg[binary]>=3.2.1
+Requires-Dist: redis>=5.0.7
