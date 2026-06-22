@@ -5,22 +5,20 @@
   "type": "module",
   "workspaces": [
     "apps/web",
-    "services/api",
     "packages/shared"
   ],
   "scripts": {
     "dev": "npm-run-all --parallel dev:web dev:api dev:region",
     "dev:web": "npm --workspace apps/web run dev",
-    "dev:api": "npm --workspace services/api run dev",
+    "dev:api": "./mvnw -f services/api-spring/pom.xml spring-boot:run",
     "dev:region": "python3 -m uvicorn services.region.app.main:app --reload --port 8090",
-    "build": "npm --workspace packages/shared run build && npm --workspace services/api run build && npm --workspace apps/web run build",
-    "lint": "npm --workspace packages/shared run lint && npm --workspace services/api run lint && npm --workspace apps/web run lint",
+    "build": "npm --workspace packages/shared run build && ./mvnw -f services/api-spring/pom.xml -DskipTests package && npm --workspace apps/web run build",
+    "lint": "npm --workspace packages/shared run lint && npm --workspace apps/web run lint",
     "test": "node --test packages/shared/test/*.test.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "integration:vote": "node scripts/integration-vote-flow.mjs"
   },
   "devDependencies": {
-    "@types/pg": "^8.20.0",
     "npm-run-all": "^4.1.5"
   }
 }

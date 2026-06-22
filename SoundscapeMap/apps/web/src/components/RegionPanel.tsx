@@ -6,6 +6,7 @@ interface Props {
   snapshot: RegionSnapshot;
   autoVote: boolean;
   spotifyConnected: boolean;
+  spotifyStatus?: string;
   colorblindPalette: boolean;
   onVote: (genre: string, trackId: string) => void;
   onSpotify: () => void;
@@ -17,6 +18,7 @@ export function RegionPanel({
   snapshot,
   autoVote,
   spotifyConnected,
+  spotifyStatus,
   colorblindPalette,
   onVote,
   onSpotify,
@@ -39,7 +41,8 @@ export function RegionPanel({
       <section className="stat-row">
         <div>
           <span className="stat-value">{snapshot.vote_count}</span>
-          <span className="stat-label">people vibing here</span>
+          <span className="stat-label">song votes here</span>
+          <span className="stat-label">from {snapshot.unique_user_count ?? 0} {(snapshot.unique_user_count ?? 0) === 1 ? 'listener/device' : 'listeners/devices'}</span>
         </div>
         <Activity size={22} aria-hidden="true" />
       </section>
@@ -85,6 +88,7 @@ export function RegionPanel({
           <input type="checkbox" checked={colorblindPalette} onChange={(event) => onColorblind(event.target.checked)} />
         </label>
       </div>
+      {spotifyStatus && <p className="status-copy">{spotifyStatus}</p>}
     </aside>
   );
 }

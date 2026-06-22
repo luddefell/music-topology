@@ -4,8 +4,8 @@ SoundscapeMap is a real-time, community-driven musical map. Users vote for the t
 
 This repository is structured as a deployable monorepo:
 
-- `apps/web` - React 18 + TypeScript + Vite + MapLibre client
-- `services/api` - Node 20 + Fastify API, auth, votes, WebSocket hub, Spotify poller
+- `apps/web` - React 18 + TypeScript + Vite + Google Maps/deck.gl client
+- `services/api-spring` - Spring Boot API, auth, votes, WebSocket hub, Spotify poller
 - `services/region` - Python 3.12 + FastAPI region aggregation and clustering pipeline
 - `packages/shared` - shared taxonomy, scoring, validation, and protocol helpers
 - `infra` - database migrations, Caddy gateway, Docker Compose
@@ -38,8 +38,18 @@ The web app runs on `http://localhost:5173`, the API on `http://localhost:8080`,
 For backing services:
 
 ```bash
-docker compose up postgres redis caddy
+POSTGRES_IMAGE=postgres:16-alpine POSTGRES_PORT=55432 docker compose up -d postgres redis
 ```
+
+Then run the API with the matching local database URL:
+
+```bash
+DATABASE_URL=postgresql://soundscape:soundscape@localhost:55432/soundscape \
+API_PORT=8080 \
+npm run dev:api
+```
+
+The default map view is centered on Cornell University and uses Google Maps with deck.gl overlays.
 
 Run the dependency-free smoke tests that verify the core domain logic:
 
@@ -54,12 +64,34 @@ Copy `.env.example` to `.env` and fill:
 - `SPOTIFY_CLIENT_ID`
 - `SPOTIFY_CLIENT_SECRET`
 - `JWT_SECRET`
-- `REFRESH_TOKEN_ENCRYPTION_KEY`
 - `DATABASE_URL`
-- `REDIS_URL`
 - `MAPTILER_API_KEY`
 
 Without Spotify credentials, anonymous voting and map viewing still work in local mode.
+
+The API is now Spring Boot and runs through the repo-local Maven wrapper:
+
+```bash
+DATABASE_URL=postgresql://soundscape:soundscape@localhost:55432/soundscape \
+PUBLIC_WEB_ORIGIN=http://127.0.0.1:5173 \
+API_PORT=18080 \
+./mvnw -f services/api-spring/pom.xml spring-boot:run
+```
+
+For Spotify login, create a Spotify Developer app and add this exact redirect URI:
+
+```text
+http://localhost:5173/callback
+```
+
+Then set at least:
+
+```bash
+SPOTIFY_CLIENT_ID=...
+SPOTIFY_REDIRECT_URI=http://localhost:5173/callback
+```
+
+If your Spotify app is configured as a confidential/server-side app, also set `SPOTIFY_CLIENT_SECRET`. Restart the API after editing `.env`.
 
 ## Launch Checklist
 

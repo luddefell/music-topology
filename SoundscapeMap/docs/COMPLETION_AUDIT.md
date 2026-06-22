@@ -12,14 +12,13 @@ This file compares the prompt requirements to the current repository state. It i
 - Phase 3.3 vote decay and score aggregation exist in `packages/shared/src/weights.js`.
 - Phase 3.2 and 3.5.8 database schema exists in `infra/db/migrations/001_init.sql`.
 - Phase 3.4 REST/WebSocket contract is documented in `docs/API.md`.
-- Phase 4.2 rate-limit primitives exist in `services/api/src/infra/rateLimiter.ts` and are wired to vote, search, and region routes.
+- Phase 4.2 rate-limit primitives exist in `services/api-spring/src/main/java/com/soundscapemap/api/service/RateLimiterService.java` and are wired to vote, search, and region routes.
 - Phase 4.3 vote payload validation exists in `packages/shared/src/validation.js`.
-- Phase 7 WebSocket subscribe/unsubscribe/broadcast hub exists in `services/api/src/ws/hub.ts`.
+- Phase 7 WebSocket subscribe/unsubscribe/broadcast hub exists in `services/api-spring/src/main/java/com/soundscapemap/api/ws`.
 - Phase 7 WebSocket broadcast has been integration-tested through Redis with a live API process.
 - Phase 8 frontend map-first UI exists in `apps/web`.
-- Phase 9.2 Spotify circuit breaker exists in `services/api/src/infra/spotifyCircuitBreaker.ts`.
-- Phase 9.4 health routes exist in `services/api/src/routes/health.ts`.
-- Phase 11 privacy and erasure/export route scaffolding exists in `services/api/src/routes/users.ts` and `docs/PRIVACY.md`.
+- Phase 9.4 health routes exist in `services/api-spring/src/main/java/com/soundscapemap/api/controller/HealthController.java`.
+- Phase 11 privacy and erasure/export route scaffolding exists in `services/api-spring/src/main/java/com/soundscapemap/api/controller/UserController.java` and `docs/PRIVACY.md`.
 - Phase 12.2 CI scaffold exists in `.github/workflows/deploy.yml`.
 - Phase 13.1 local unit tests exist in `packages/shared/test/domain.test.mjs`.
 - Phase 13 integration coverage now includes `scripts/integration-vote-flow.mjs`.
@@ -29,15 +28,17 @@ This file compares the prompt requirements to the current repository state. It i
 
 - `npm test` passes: 4 domain tests.
 - `npm run smoke` passes.
-- `npm run lint` passes across shared, API, and web workspaces.
-- `npm run build` passes across shared, API, and web workspaces.
+- `npm run lint` passes across shared and web workspaces.
+- `npm run build` passes across shared, Spring API, and web workspaces when Maven is on `PATH`.
 - `python3 -m compileall services/region/app` passes.
-- `npm audit --omit=dev` passes with 0 vulnerabilities after upgrading Fastify.
 - Browser check at `http://localhost:5173/` rendered `SoundscapeMap`, `Vote`, a visible region panel, and a MapLibre container without a Vite error overlay.
 - Docker Compose successfully ran isolated Redis and plain PostgreSQL on port `55432`; migration created `users`, `votes`, `region_snapshots`, `spotify_cache`, `region_clusters`, and `cluster_quality_log`.
 - `npm run integration:vote` passed against live API/PostgreSQL/Redis, proving anonymous auth, vote persistence, region snapshot persistence, Redis publish, and WebSocket `region_update`.
 - Region service dependencies installed in `.venv`; direct FastAPI route-function verification passed for `health` and `cluster`.
 - Forced `REGION_MODEL=hdbscan` pipeline verification produced 2 clusters with silhouette `0.9993941897782215`, Davies-Bouldin `0.0008552615013285442`, and fit duration `1563ms`.
+- 2026-06-18 stabilization: browser verification showed Cornell University, no `Reconnecting` banner, a MapLibre canvas, and no console errors.
+- 2026-06-18 stabilization: `npm run integration:vote` passed again against fresh local Postgres/Redis/API after Redis timeout hardening.
+- 2026-06-18 stabilization: Spotify button now starts the real `/api/auth/spotify/start` flow and reports missing `.env` credentials instead of pretending anonymous auth is Spotify.
 
 ## Implemented But Not Fully Proven
 

@@ -1,0 +1,18 @@
+server:
+  port: ${API_PORT:8080}
+
+spring:
+  application:
+    name: soundscapemap-api
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/soundscape}
+    username: ${DATABASE_USERNAME:}
+    password: ${DATABASE_PASSWORD:}
+
+soundscape:
+  public-web-origin: ${PUBLIC_WEB_ORIGIN:http://localhost:5173}
+  spotify-client-id: ${SPOTIFY_CLIENT_ID:}
+  spotify-client-secret: ${SPOTIFY_CLIENT_SECRET:}
+  spotify-redirect-uri: ${SPOTIFY_REDIRECT_URI:http://localhost:5173/callback}
+  jwt-secret: ${JWT_SECRET:local-development-secret-change-me}
+  enable-auto-vote: ${ENABLE_AUTO_VOTE:true}

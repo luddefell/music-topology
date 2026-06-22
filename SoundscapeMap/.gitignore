@@ -11,3 +11,4 @@ __pycache__/
 coverage/
 apps/web/dist/
 services/api/dist/
+services/api-spring/target/

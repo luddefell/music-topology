@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
   spotify_id TEXT UNIQUE,
   device_hash TEXT UNIQUE,
   encrypted_refresh_token TEXT,
+  spotify_access_token TEXT,
+  spotify_token_expires_at TIMESTAMPTZ,
   auto_vote_enabled BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -22,6 +24,8 @@ CREATE TABLE IF NOT EXISTS votes (
   id BIGSERIAL,
   user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   h3_cell TEXT NOT NULL,
+  region_id TEXT,
+  region_type TEXT DEFAULT 'h3',
   track_id TEXT NOT NULL,
   genre TEXT NOT NULL,
   weight FLOAT DEFAULT 1.0,
@@ -40,12 +44,19 @@ $$;
 
 CREATE INDEX IF NOT EXISTS votes_h3_cell_voted_at_idx ON votes (h3_cell, voted_at DESC);
 CREATE INDEX IF NOT EXISTS votes_user_cell_window_idx ON votes (user_id, h3_cell, voted_at DESC);
+CREATE INDEX IF NOT EXISTS votes_region_voted_at_idx ON votes (region_id, voted_at DESC);
+CREATE INDEX IF NOT EXISTS votes_user_region_window_idx ON votes (user_id, region_id, voted_at DESC);
 
 CREATE TABLE IF NOT EXISTS region_snapshots (
   h3_cell TEXT NOT NULL,
+  region_id TEXT,
+  region_type TEXT DEFAULT 'h3',
+  name TEXT,
+  subtitle TEXT,
   dominant_genre TEXT NOT NULL,
   genre_scores JSONB NOT NULL,
   vote_count INT NOT NULL,
+  unique_user_count INT DEFAULT 0,
   top_tracks JSONB DEFAULT '[]'::jsonb,
   computed_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (h3_cell, computed_at)
@@ -53,6 +64,11 @@ CREATE TABLE IF NOT EXISTS region_snapshots (
 
 CREATE TABLE IF NOT EXISTS spotify_cache (
   track_id TEXT PRIMARY KEY,
+  name TEXT,
+  artist TEXT,
+  album_art TEXT,
+  inferred_genre TEXT,
+  genre_label TEXT,
   artist_id TEXT,
   genres TEXT[],
   audio_features JSONB,
