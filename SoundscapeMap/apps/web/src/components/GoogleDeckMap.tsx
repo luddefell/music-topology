@@ -5,7 +5,7 @@ import { GeoJsonLayer } from '@deck.gl/layers';
 import { H3HexagonLayer } from '@deck.gl/geo-layers';
 import type { PickingInfo } from '@deck.gl/core';
 import { cellToBoundary, cellToLatLng, isValidCell } from 'h3-js';
-import { CORNELL_REGIONS } from '@soundscapemap/shared';
+import { CORNELL_REGIONS, getGenreColor } from '@soundscapemap/shared';
 import { cornellTileIds } from '../map/cornellTiles';
 import type { RegionSnapshot } from '../state/useAppStore';
 
@@ -14,8 +14,20 @@ interface Props {
   mapId?: string;
   selectedRegionId?: string;
   snapshots: Record<string, RegionSnapshot>;
+  learnedRegions?: LearnedRegion[];
   colorblindPalette: boolean;
   onSelectRegion: (regionId: string) => void;
+}
+
+export interface LearnedRegion {
+  region_id: string;
+  label: string;
+  model_version: string;
+  h3_cells: string[];
+  dominant_genre: string;
+  descriptors?: string[];
+  confidence: number;
+  event_count: number;
 }
 
 interface LearnedCell {
@@ -24,6 +36,8 @@ interface LearnedCell {
   voteCount: number;
   confidence: number;
   selected: boolean;
+  learnedRegionId?: string;
+  learnedLabel?: string;
 }
 
 const CORNELL_CENTER = { lat: 42.4457, lng: -76.4795 };
@@ -86,15 +100,20 @@ function selectedTileLabel(regionId?: string) {
   return nearest ? `Near ${nearest.name}` : `Tile ${regionId.slice(-6)}`;
 }
 
-function learnedCells(snapshots: Record<string, RegionSnapshot>, selectedRegionId?: string): LearnedCell[] {
+function learnedCells(snapshots: Record<string, RegionSnapshot>, learnedRegions: LearnedRegion[] = [], selectedRegionId?: string): LearnedCell[] {
+  const learnedByCell = new Map<string, LearnedRegion>();
+  learnedRegions.forEach((region) => region.h3_cells.forEach((h3) => learnedByCell.set(h3, region)));
   return CAMPUS_TILE_IDS.map((h3) => {
     const snapshot = snapshots[h3];
+    const learned = learnedByCell.get(h3);
     return {
       h3,
-      dominantGenre: snapshot?.dominant_genre ?? 'pop',
+      dominantGenre: learned?.dominant_genre ?? snapshot?.dominant_genre ?? 'unknown',
       voteCount: snapshot?.vote_count ?? 0,
-      confidence: snapshot ? confidenceFor(snapshot) : 0.18,
-      selected: h3 === selectedRegionId
+      confidence: learned?.confidence ?? (snapshot ? confidenceFor(snapshot) : 0.18),
+      selected: h3 === selectedRegionId,
+      learnedRegionId: learned?.region_id,
+      learnedLabel: learned?.label
     };
   });
 }
@@ -115,17 +134,21 @@ function h3BoundaryFeatures(cells: LearnedCell[]) {
 
 function createLayers(
   snapshots: Record<string, RegionSnapshot>,
+  learnedRegions: LearnedRegion[] | undefined,
   selectedRegionId: string | undefined,
   colorblindPalette: boolean,
   onSelectRegion: (regionId: string) => void
 ) {
-  const cells = learnedCells(snapshots, selectedRegionId);
+  const cells = learnedCells(snapshots, learnedRegions, selectedRegionId);
   return [
     new H3HexagonLayer<LearnedCell>({
       id: 'learned-h3-cells',
       data: cells,
       getHexagon: (cell) => cell.h3,
       getFillColor: (cell) => {
+        if (cell.learnedRegionId) {
+          return hexToRgba(getGenreColor(cell.dominantGenre, colorblindPalette), Math.round(92 + cell.confidence * 130));
+        }
         if (cell.voteCount <= 0) {
           return cell.selected ? [25, 33, 38, 70] : [35, 43, 48, 14];
         }
@@ -136,9 +159,10 @@ function createLayers(
       },
       getLineColor: (cell) => {
         if (cell.selected) return [17, 24, 28, 255];
+        if (cell.learnedRegionId) return [18, 24, 28, 156];
         return cell.voteCount > 0 ? [255, 255, 255, 84] : [40, 48, 52, 16];
       },
-      getLineWidth: (cell) => cell.selected ? 3.5 : 0.45,
+      getLineWidth: (cell) => cell.selected ? 3.5 : (cell.learnedRegionId ? 1.2 : 0.45),
       lineWidthUnits: 'pixels',
       pickable: true,
       coverage: 0.9,
@@ -146,8 +170,8 @@ function createLayers(
         if (info.object?.h3) onSelectRegion(info.object.h3);
       },
       updateTriggers: {
-        getFillColor: [snapshots, selectedRegionId, colorblindPalette],
-        getLineColor: [snapshots, selectedRegionId, colorblindPalette]
+        getFillColor: [snapshots, learnedRegions, selectedRegionId, colorblindPalette],
+        getLineColor: [snapshots, learnedRegions, selectedRegionId, colorblindPalette]
       }
     }),
     new GeoJsonLayer<Record<string, unknown>>({
@@ -175,7 +199,7 @@ function createLayers(
   ];
 }
 
-export function GoogleDeckMap({ apiKey, mapId, selectedRegionId, snapshots, colorblindPalette, onSelectRegion }: Props) {
+export function GoogleDeckMap({ apiKey, mapId, selectedRegionId, snapshots, learnedRegions, colorblindPalette, onSelectRegion }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const overlayRef = useRef<GoogleMapsOverlay | null>(null);
@@ -183,8 +207,8 @@ export function GoogleDeckMap({ apiKey, mapId, selectedRegionId, snapshots, colo
   const [status, setStatus] = useState(apiKey ? 'Loading analytical Google map...' : 'Google Maps key missing. Add VITE_GOOGLE_MAPS_API_KEY.');
 
   const layers = useMemo(
-    () => createLayers(snapshots, selectedRegionId, colorblindPalette, onSelectRegion),
-    [snapshots, selectedRegionId, colorblindPalette, onSelectRegion]
+    () => createLayers(snapshots, learnedRegions, selectedRegionId, colorblindPalette, onSelectRegion),
+    [snapshots, learnedRegions, selectedRegionId, colorblindPalette, onSelectRegion]
   );
 
   useEffect(() => {
@@ -243,7 +267,7 @@ export function GoogleDeckMap({ apiKey, mapId, selectedRegionId, snapshots, colo
       <div ref={containerRef} className="google-map-canvas analytical-map-canvas" />
       <div className="map-status-pill">{status}</div>
       <div className="map-legend analytical-legend">
-        <span>Learned zones</span>
+        <span>{learnedRegions?.length ? `${learnedRegions.length} ML zones` : 'Learned zones'}</span>
         <div><i className="legend-low" /><i className="legend-mid" /><i className="legend-high" /></div>
       </div>
       <button

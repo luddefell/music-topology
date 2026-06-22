@@ -10,7 +10,8 @@ export const MACRO_GENRES = [
   { id: 'rnb', label: 'R&B / Soul', color: '#A855F7', colorblindColor: '#CC79A7', icon: 'S' },
   { id: 'folk', label: 'Folk / Indie', color: '#78716C', colorblindColor: '#999999', icon: 'F' },
   { id: 'metal', label: 'Metal', color: '#1F2937', colorblindColor: '#000000', icon: 'M' },
-  { id: 'world', label: 'World', color: '#10B981', colorblindColor: '#009E73', icon: 'W' }
+  { id: 'world', label: 'World', color: '#10B981', colorblindColor: '#009E73', icon: 'W' },
+  { id: 'unknown', label: 'Unknown', color: '#64748B', colorblindColor: '#999999', icon: '?' }
 ];
 
 export const GENRE_IDS = MACRO_GENRES.map((genre) => genre.id);
@@ -31,7 +32,7 @@ const RULES = [
   ['pop', /\b(pop|chart|boy band|girl group|dance pop|pop rap|pop rock|synthpop|teen pop|viral pop|post-teen pop|soft pop|power pop|brill building pop|bubblegum pop)\b/]
 ];
 
-const FALLBACK_GENRE = 'pop';
+const FALLBACK_GENRE = 'unknown';
 const POP_PENALTY = 0.72;
 
 export function isMacroGenre(value) {
@@ -53,7 +54,7 @@ export function classifyGenre(spotifyGenres = []) {
 }
 
 export function getGenreColor(genre, colorblind = false) {
-  const item = GENRE_BY_ID[genre] ?? GENRE_BY_ID.pop;
+  const item = GENRE_BY_ID[genre] ?? GENRE_BY_ID.unknown;
   return colorblind ? item.colorblindColor : item.color;
 }
 

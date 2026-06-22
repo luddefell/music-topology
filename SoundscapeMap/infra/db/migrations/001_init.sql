@@ -103,6 +103,71 @@ CREATE TABLE IF NOT EXISTS cluster_quality_log (
   fit_duration_ms INT
 );
 
+CREATE TABLE IF NOT EXISTS track_enrichments (
+  track_id TEXT PRIMARY KEY,
+  name TEXT,
+  artist TEXT,
+  album_art TEXT,
+  source_genre_label TEXT,
+  descriptors JSONB NOT NULL DEFAULT '[]'::jsonb,
+  embedding JSONB NOT NULL DEFAULT '[]'::jsonb,
+  model_version TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS track_embeddings (
+  track_id TEXT PRIMARY KEY REFERENCES track_enrichments(track_id) ON DELETE CASCADE,
+  model_version TEXT NOT NULL,
+  dimensions INT NOT NULL,
+  vector JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS tile_music_vectors (
+  region_id TEXT PRIMARY KEY,
+  region_type TEXT NOT NULL DEFAULT 'h3',
+  event_count INT NOT NULL,
+  unique_user_count INT NOT NULL,
+  genre_scores JSONB NOT NULL,
+  descriptors JSONB NOT NULL DEFAULT '[]'::jsonb,
+  embedding JSONB NOT NULL,
+  model_version TEXT NOT NULL,
+  computed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS learned_regions (
+  region_id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  model_version TEXT NOT NULL,
+  h3_cells TEXT[] NOT NULL,
+  dominant_genre TEXT NOT NULL,
+  genre_scores JSONB NOT NULL,
+  descriptors JSONB NOT NULL DEFAULT '[]'::jsonb,
+  confidence FLOAT NOT NULL,
+  event_count INT NOT NULL,
+  computed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS learned_region_members (
+  region_id TEXT REFERENCES learned_regions(region_id) ON DELETE CASCADE,
+  h3_cell TEXT NOT NULL,
+  confidence FLOAT NOT NULL,
+  PRIMARY KEY (region_id, h3_cell)
+);
+
+CREATE TABLE IF NOT EXISTS ml_run_log (
+  id UUID PRIMARY KEY,
+  model_version TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  finished_at TIMESTAMPTZ NOT NULL,
+  tile_count INT NOT NULL,
+  region_count INT NOT NULL,
+  hyperparameters JSONB NOT NULL,
+  quality JSONB NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ml_run_log_finished_at_idx ON ml_run_log (finished_at DESC);
+
 CREATE MATERIALIZED VIEW IF NOT EXISTS region_current_scores AS
 SELECT
   h3_cell,

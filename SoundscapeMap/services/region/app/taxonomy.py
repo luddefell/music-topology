@@ -11,6 +11,7 @@ GENRES = [
     "folk",
     "metal",
     "world",
+    "unknown",
 ]
 
 GENRE_COLORS = {
@@ -27,4 +28,5 @@ GENRE_COLORS = {
     "metal": "#1F2937",
     "world": "#10B981",
     "mixed": "#7A6F64",
+    "unknown": "#64748B",
 }

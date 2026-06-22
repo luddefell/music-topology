@@ -18,7 +18,7 @@ export function computeRegionScores(votes, now = new Date()) {
   return scores;
 }
 
-export function dominantGenre(scores, fallback = 'pop') {
+export function dominantGenre(scores, fallback = 'unknown') {
   let bestGenre = fallback;
   let bestScore = -Infinity;
   for (const [genre, score] of Object.entries(scores)) {

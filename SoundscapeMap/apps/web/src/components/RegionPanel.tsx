@@ -25,7 +25,7 @@ export function RegionPanel({
   onAutoVote,
   onColorblind
 }: Props) {
-  const dominant = GENRE_BY_ID[snapshot.dominant_genre] ?? GENRE_BY_ID.pop;
+  const dominant = GENRE_BY_ID[snapshot.dominant_genre] ?? GENRE_BY_ID.unknown;
   const topScores = sortedGenreScores(snapshot.genre_scores).slice(0, 3);
 
   return (
@@ -49,7 +49,7 @@ export function RegionPanel({
 
       <section className="score-bars" aria-label="Genre distribution">
         {topScores.length ? topScores.map(([genre, score]) => {
-          const item = GENRE_BY_ID[genre] ?? GENRE_BY_ID.pop;
+          const item = GENRE_BY_ID[genre] ?? GENRE_BY_ID.unknown;
           const width = `${Math.max(8, Math.min(100, score * 100))}%`;
           return (
             <div className="score-line" key={genre}>

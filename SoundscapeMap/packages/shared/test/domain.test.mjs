@@ -21,7 +21,7 @@ test('classifyGenre maps Spotify genre strings to macro genres', () => {
   assert.equal(classifyGenre(['bedroom pop', 'indie pop']), 'folk');
   assert.equal(classifyGenre(['hyperpop', 'escape room']), 'electronic');
   assert.equal(classifyGenre(['latin trap', 'urbano latino']), 'latin');
-  assert.equal(classifyGenre(['unknown shimmer music']), 'pop');
+  assert.equal(classifyGenre(['unknown shimmer music']), 'unknown');
 });
 
 test('computeWeight applies a 45 minute half-life', () => {

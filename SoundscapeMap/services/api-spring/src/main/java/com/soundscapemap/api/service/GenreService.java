@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class GenreService {
   private static final double HALF_LIFE_MINUTES = 45.0;
-  private static final String FALLBACK = "pop";
+  private static final String FALLBACK = "unknown";
   private static final Map<String, Pattern> RULES = Map.ofEntries(
       Map.entry("hiphop", Pattern.compile("\\b(hip.?hop|rap|trap|drill|grime|phonk|melodic rap|conscious rap|cloud rap|emo rap)\\b")),
       Map.entry("electronic", Pattern.compile("\\b(electr|house|techno|edm|dance|dubstep|ambient|trance|garage|dnb|drum and bass|hyperpop|escape room|future bass)\\b")),

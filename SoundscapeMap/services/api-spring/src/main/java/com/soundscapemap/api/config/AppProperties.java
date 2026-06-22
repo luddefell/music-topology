@@ -9,5 +9,16 @@ public record AppProperties(
     String spotifyClientSecret,
     String spotifyRedirectUri,
     String jwtSecret,
-    boolean enableAutoVote
+    boolean enableAutoVote,
+    String regionServiceUrl,
+    int mlEventWindowMinutes,
+    int mlMinEventsPerTile,
+    double mlMusicSimilarityThreshold,
+    double mlSpatialWeight,
+    double mlSameUserRepeatPenalty,
+    double mlListeningWeight,
+    double mlManualVoteWeight,
+    String mlLlmDescriptorUrl,
+    String mlLlmApiKey,
+    String mlLlmModel
 ) {}

@@ -38,7 +38,7 @@ def entropy(distribution: dict[str, float]) -> float:
 
 def dominant_genre(scores: dict[str, float]) -> str:
     if not scores:
-        return "pop"
+        return "unknown"
     return max(scores.items(), key=lambda item: item[1])[0]
 
 
@@ -149,7 +149,7 @@ def evaluate_quality(x: np.ndarray, labels: np.ndarray, fit_duration_ms: int, mo
 
 
 def cluster_cells(cells: list[CellSignal]) -> dict[str, Any]:
-    eligible = [cell for cell in cells if cell.vote_count >= 3]
+    eligible = [cell for cell in cells if cell.vote_count >= settings.cluster_min_votes_per_cell]
     if not eligible:
         return {"features": [], "quality": evaluate_quality(np.empty((0, 0)), np.array([]), 0, "fixed_h3")}
 

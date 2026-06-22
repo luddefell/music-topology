@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AudioLines, Headphones, LocateFixed, Music2, Radio, RotateCcw, Search, ShieldCheck, Sparkles, WifiOff } from 'lucide-react';
 import { CORNELL_REGIONS, GENRE_BY_ID, sortedGenreScores, type CornellRegion } from '@soundscapemap/shared';
 import { cellToLatLng, gridDisk, isValidCell, latLngToCell } from 'h3-js';
-import { GoogleDeckMap } from './components/GoogleDeckMap';
+import { GoogleDeckMap, type LearnedRegion } from './components/GoogleDeckMap';
 import { SoundscapeSocket } from './map/wsClient';
 import { CORNELL_H3_RESOLUTION, cornellTileIds } from './map/cornellTiles';
 import { useAppStore, type RegionSnapshot } from './state/useAppStore';
@@ -31,6 +31,17 @@ interface ListeningStatusResponse {
   last_vote_at?: string;
   last_track_name?: string;
   last_error?: string;
+}
+
+interface MlRegionResponse {
+  regions?: LearnedRegion[];
+  run?: {
+    model_version?: string;
+    tile_count?: number;
+    region_count?: number;
+    quality?: Record<string, unknown>;
+  };
+  hyperparameters?: Record<string, unknown>;
 }
 
 function relativeTimeLabel(value?: string) {
@@ -102,7 +113,7 @@ function emptySnapshot(regionId: string): RegionSnapshot {
     h3_cell: isTile ? regionId : region?.region_id ?? regionId,
     name: region?.name ?? (isTile ? `Tile ${regionId.slice(-6)}` : undefined),
     subtitle: region?.subtitle ?? (isTile ? 'Learned H3 sound tile' : undefined),
-    dominant_genre: 'pop',
+    dominant_genre: 'unknown',
     genre_scores: {},
     vote_count: 0,
     unique_user_count: 0,
@@ -122,6 +133,9 @@ export function App() {
   const [listeningStatusText, setListeningStatusText] = useState('');
   const [locationFollow, setLocationFollow] = useState(false);
   const [locationStatus, setLocationStatus] = useState('');
+  const [learnedRegions, setLearnedRegions] = useState<LearnedRegion[]>([]);
+  const [mlRun, setMlRun] = useState<MlRegionResponse['run']>();
+  const [mlStatus, setMlStatus] = useState('ML regions waiting for song activity');
   const {
     jwt,
     snapshots,
@@ -146,9 +160,23 @@ export function App() {
   const activeTargetName = activeSnapshot.name ?? (nearbyRegion ? `Near ${nearbyRegion.name}` : `Tile ${activeRegionId.slice(-6)}`);
   const activeTargetSubtitle = activeSnapshot.subtitle ?? (nearbyRegion ? `${nearbyRegion.subtitle} · Tile ${activeRegionId.slice(-6)}` : 'Learned H3 sound tile');
   const activeTargetType = activeSnapshot.region_type === 'h3' || isValidCell(activeRegionId) ? 'tile' : activeSnapshot.region_type;
-  const dominant = GENRE_BY_ID[activeSnapshot.dominant_genre] ?? GENRE_BY_ID.pop;
+  const dominant = GENRE_BY_ID[activeSnapshot.dominant_genre] ?? GENRE_BY_ID.unknown;
+  const showDominantGenre = activeSnapshot.dominant_genre !== 'unknown';
   const topScores = sortedGenreScores(activeSnapshot.genre_scores).slice(0, 3);
   const uniqueContributorCount = activeSnapshot.unique_user_count ?? 0;
+  const activeLearnedRegion = learnedRegions.find((region) => region.h3_cells.includes(activeRegionId));
+
+  const refreshMlRegions = useCallback(async () => {
+    const response = await fetch(`${API_BASE}/api/ml/regions`);
+    if (!response.ok) {
+      setMlStatus('ML regions unavailable');
+      return;
+    }
+    const data = await response.json() as MlRegionResponse;
+    setLearnedRegions(data.regions ?? []);
+    setMlRun(data.run);
+    setMlStatus((data.regions?.length ?? 0) > 0 ? `${data.regions?.length} learned sound regions` : 'ML regions waiting for song activity');
+  }, []);
 
   useEffect(() => {
     const storedJwt = localStorage.getItem('soundscape_jwt');
@@ -219,7 +247,8 @@ export function App() {
         });
       })
       .catch(() => undefined);
-  }, [mergeSnapshot, selectRegion, selectedRegionId, tileIds]);
+    void refreshMlRegions();
+  }, [mergeSnapshot, refreshMlRegions, selectRegion, selectedRegionId, tileIds]);
 
   useEffect(() => {
     const socket = new SoundscapeSocket(WS_URL, mergeSnapshot, setWsStatus);
@@ -333,6 +362,13 @@ export function App() {
       return;
     }
     mergeSnapshot(data.region_snapshot);
+    if (data.ml?.regions) {
+      setLearnedRegions(data.ml.regions);
+      setMlRun(data.ml.quality ? { model_version: data.ml.quality.model, tile_count: data.ml.quality.tile_count, region_count: data.ml.quality.region_count, quality: data.ml.quality } : undefined);
+      setMlStatus(`${data.ml.regions.length} learned sound regions`);
+    } else {
+      void refreshMlRegions();
+    }
     setSearchStatus(`${selectedTrack.name} added to ${activeTargetName}`);
   }
 
@@ -494,6 +530,7 @@ export function App() {
         mapId={GOOGLE_MAP_ID}
         selectedRegionId={activeRegionId}
         snapshots={snapshots}
+        learnedRegions={learnedRegions}
         colorblindPalette={colorblindPalette}
         onSelectRegion={selectActiveTile}
       />
@@ -514,13 +551,26 @@ export function App() {
         <div className="region-kicker">{activeTargetType}</div>
         <h2>{activeTargetName}</h2>
         <p>{activeTargetSubtitle}</p>
-
-        <section className="dominant-card">
-          <div className="genre-chip" style={{ borderColor: dominant.color }}>
-            <AudioLines size={18} />
-            {dominant.label}
-          </div>
+        <section className="ml-region-card">
+          <span>ML SOUND REGION</span>
+          <strong>{activeLearnedRegion?.label ?? 'No learned region yet'}</strong>
+          <small>
+            {activeLearnedRegion
+              ? `${Math.round(activeLearnedRegion.confidence * 100)}% confidence · ${activeLearnedRegion.h3_cells.length} tiles · ${activeLearnedRegion.event_count} events`
+              : mlStatus}
+          </small>
+          {activeLearnedRegion?.descriptors?.length ? <em>{activeLearnedRegion.descriptors.slice(0, 4).join(' · ')}</em> : null}
+          {mlRun?.model_version && <code>{mlRun.model_version}</code>}
         </section>
+
+        {showDominantGenre && (
+          <section className="dominant-card">
+            <div className="genre-chip" style={{ borderColor: dominant.color }}>
+              <AudioLines size={18} />
+              {dominant.label}
+            </div>
+          </section>
+        )}
 
         <section className="metric-grid" aria-label="Tile sound metrics">
           <div>
@@ -535,7 +585,7 @@ export function App() {
 
         <section className="score-bars">
           {topScores.length ? topScores.map(([genre, score]) => {
-            const item = GENRE_BY_ID[genre] ?? GENRE_BY_ID.pop;
+            const item = GENRE_BY_ID[genre] ?? GENRE_BY_ID.unknown;
             return (
               <div className="score-line" key={genre}>
                 <span>{item.label}</span>

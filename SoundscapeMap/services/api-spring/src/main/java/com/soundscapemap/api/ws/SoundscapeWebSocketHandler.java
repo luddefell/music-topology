@@ -2,6 +2,7 @@ package com.soundscapemap.api.ws;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -20,9 +21,13 @@ public class SoundscapeWebSocketHandler extends TextWebSocketHandler {
   }
 
   @Override
-  public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+  public void afterConnectionEstablished(WebSocketSession session) {
     hub.add(session);
-    session.sendMessage(new TextMessage("{\"type\":\"ping\"}"));
+    try {
+      session.sendMessage(new TextMessage("{\"type\":\"ping\"}"));
+    } catch (IOException error) {
+      hub.remove(session);
+    }
   }
 
   @Override

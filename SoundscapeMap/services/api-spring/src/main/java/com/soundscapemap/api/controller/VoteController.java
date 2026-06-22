@@ -7,6 +7,7 @@ import com.soundscapemap.api.model.UserSession;
 import com.soundscapemap.api.model.VoteInput;
 import com.soundscapemap.api.repository.SoundscapeRepository;
 import com.soundscapemap.api.service.JwtService;
+import com.soundscapemap.api.service.MlRegionService;
 import com.soundscapemap.api.service.RateLimiterService;
 import com.soundscapemap.api.service.ValidationService;
 import com.soundscapemap.api.ws.RegionUpdateHub;
@@ -27,13 +28,15 @@ public class VoteController {
   private final ValidationService validation;
   private final RateLimiterService limiter;
   private final RegionUpdateHub hub;
+  private final MlRegionService ml;
 
-  public VoteController(JwtService jwt, SoundscapeRepository repository, ValidationService validation, RateLimiterService limiter, RegionUpdateHub hub) {
+  public VoteController(JwtService jwt, SoundscapeRepository repository, ValidationService validation, RateLimiterService limiter, RegionUpdateHub hub, MlRegionService ml) {
     this.jwt = jwt;
     this.repository = repository;
     this.validation = validation;
     this.limiter = limiter;
     this.hub = hub;
+    this.ml = ml;
   }
 
   @PostMapping("/api/votes")
@@ -71,7 +74,13 @@ public class VoteController {
     ));
     var snapshot = repository.computeSnapshot(region.regionId(), region.regionType());
     hub.publish(snapshot);
-    return ResponseEntity.ok(Map.of("ok", true, "region_snapshot", snapshot));
+    Map<String, Object> mlResult = Map.of("status", "skipped");
+    try {
+      mlResult = ml.rebuildLearnedRegions();
+    } catch (Exception error) {
+      mlResult = Map.of("status", "failed", "message", error.getMessage());
+    }
+    return ResponseEntity.ok(Map.of("ok", true, "region_snapshot", snapshot, "ml", mlResult));
   }
 
   private String string(Map<String, Object> body, String key) {

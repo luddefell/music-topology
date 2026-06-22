@@ -32,7 +32,7 @@ export function emptySnapshot(cell: string): RegionSnapshot {
     region_id: cell,
     region_type: 'h3',
     h3_cell: cell,
-    dominant_genre: 'pop',
+    dominant_genre: 'unknown',
     genre_scores: {},
     vote_count: 0,
     top_tracks: []

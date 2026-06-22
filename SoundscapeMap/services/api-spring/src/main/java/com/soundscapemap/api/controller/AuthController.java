@@ -78,6 +78,14 @@ public class AuthController {
       repository.saveSpotifyToken(userId, token.accessToken(), token.refreshToken(), token.expiresIn());
       String issued = jwt.issue(new UserSession(userId, profile.id(), false));
       return ResponseEntity.ok(Map.of("jwt", issued, "expires_in", 3600));
+    } catch (SpotifyService.SpotifyApiException error) {
+      if (error.statusCode() == 403) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiError.of(
+            "SPOTIFY_USER_FORBIDDEN",
+            "Spotify authorized the login, but refused API access for this account. Add this exact Spotify account to the app's Users Management allowlist and make sure the app owner account has Spotify Premium. Spotify response: " + error.responseBody()
+        ));
+      }
+      return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ApiError.of("SPOTIFY_PROFILE_FAILED", "Spotify profile lookup failed: " + error.responseBody()));
     } catch (Exception error) {
       return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ApiError.of("SPOTIFY_TOKEN_EXCHANGE_FAILED", "Spotify token exchange failed: " + error.getMessage()));
     }

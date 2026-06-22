@@ -60,7 +60,7 @@ function regionCollection(snapshots: Record<string, RegionSnapshot>, colorblindP
     type: 'FeatureCollection',
     features: CORNELL_REGIONS.map((region: CornellRegion) => {
       const snapshot = snapshots[region.region_id];
-      const color = getGenreColor(snapshot?.dominant_genre ?? 'pop', colorblindPalette);
+      const color = getGenreColor(snapshot?.dominant_genre ?? 'unknown', colorblindPalette);
       return {
         type: 'Feature',
         geometry: { type: 'Polygon', coordinates: [region.footprint] },
@@ -142,7 +142,7 @@ export function Google3DMap({ apiKey, enabled, selectedRegionId, snapshots, colo
       source.entities.values.forEach((entity) => {
         const regionId = entity.properties?.region_id?.getValue();
         const snapshot = snapshots[regionId];
-        const color = Color.fromCssColorString(getGenreColor(snapshot?.dominant_genre ?? 'pop', colorblindPalette));
+        const color = Color.fromCssColorString(getGenreColor(snapshot?.dominant_genre ?? 'unknown', colorblindPalette));
         const isSelected = regionId === selectedRegionId;
         if (entity.polygon) {
           entity.polygon.material = new ColorMaterialProperty(color.withAlpha(isSelected ? OVERLAY_ALPHA.active : OVERLAY_ALPHA.idle));
@@ -153,7 +153,7 @@ export function Google3DMap({ apiKey, enabled, selectedRegionId, snapshots, colo
       });
       CORNELL_REGIONS.forEach((region) => {
         const snapshot = snapshots[region.region_id];
-        const color = Color.fromCssColorString(getGenreColor(snapshot?.dominant_genre ?? 'pop', colorblindPalette));
+        const color = Color.fromCssColorString(getGenreColor(snapshot?.dominant_genre ?? 'unknown', colorblindPalette));
         const isSelected = region.region_id === selectedRegionId;
         source.entities.add({
           position: Cartesian3.fromDegrees(region.position.longitude, region.position.latitude),
@@ -193,7 +193,7 @@ export function Google3DMap({ apiKey, enabled, selectedRegionId, snapshots, colo
           name: region.name,
           x: Math.round(screen.x / pixelRatio),
           y: Math.round(screen.y / pixelRatio),
-          color: getGenreColor(snapshot?.dominant_genre ?? 'pop', colorblindPalette),
+          color: getGenreColor(snapshot?.dominant_genre ?? 'unknown', colorblindPalette),
           voteCount: snapshot?.vote_count ?? 0,
           selected: region.region_id === selectedRegionId
         };

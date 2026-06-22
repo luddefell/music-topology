@@ -19,15 +19,23 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 @Service
 public class SpotifyService {
-  private static final List<String> SCOPES = List.of("user-read-playback-state", "user-read-currently-playing", "user-read-recently-played");
+  private static final List<String> SCOPES = List.of(
+      "user-read-private",
+      "user-read-playback-state",
+      "user-read-currently-playing",
+      "user-read-recently-played"
+  );
   private final SecureRandom random = new SecureRandom();
   private final RestClient rest = RestClient.create();
   private final AppProperties properties;
   private final GenreService genres;
   private final SoundscapeRepository repository;
+  private String catalogAccessToken;
+  private Instant catalogTokenExpiresAt = Instant.EPOCH;
 
   public SpotifyService(AppProperties properties, GenreService genres, SoundscapeRepository repository) {
     this.properties = properties;
@@ -37,6 +45,10 @@ public class SpotifyService {
 
   public boolean configured() {
     return properties.spotifyClientId() != null && !properties.spotifyClientId().isBlank();
+  }
+
+  public boolean catalogSearchConfigured() {
+    return configured() && properties.spotifyClientSecret() != null && !properties.spotifyClientSecret().isBlank();
   }
 
   public List<String> scopes() {
@@ -63,6 +75,9 @@ public class SpotifyService {
     form.add("redirect_uri", properties.spotifyRedirectUri());
     form.add("client_id", properties.spotifyClientId());
     form.add("code_verifier", verifier);
+    if (properties.spotifyClientSecret() != null && !properties.spotifyClientSecret().isBlank()) {
+      form.add("client_secret", properties.spotifyClientSecret());
+    }
     return postToken(form);
   }
 
@@ -88,116 +103,179 @@ public class SpotifyService {
   }
 
   public SpotifyProfile profile(String accessToken) {
-    Map<?, ?> json = rest.get()
-        .uri("https://api.spotify.com/v1/me")
-        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-        .retrieve()
-        .body(Map.class);
-    return new SpotifyProfile(String.valueOf(json.get("id")));
+    try {
+      Map<?, ?> json = rest.get()
+          .uri("https://api.spotify.com/v1/me")
+          .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+          .retrieve()
+          .body(Map.class);
+      return new SpotifyProfile(String.valueOf(json.get("id")));
+    } catch (RestClientResponseException error) {
+      throw new SpotifyApiException(error.getStatusCode().value(), error.getResponseBodyAsString(), error);
+    }
+  }
+
+  public List<TrackResult> searchCatalogTracks(String query) {
+    return searchTracks(catalogToken(), query);
   }
 
   public List<TrackResult> searchTracks(String accessToken, String query) {
-    URI uri = URI.create("https://api.spotify.com/v1/search?type=track&limit=8&q=" + enc(query));
-    Map<?, ?> json = rest.get()
-        .uri(uri)
-        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-        .retrieve()
-        .body(Map.class);
-    Map<?, ?> tracksObject = (Map<?, ?>) json.get("tracks");
-    List<?> items = tracksObject == null ? List.of() : listValue(tracksObject, "items");
-    List<TrackParts> parts = new ArrayList<>();
-    List<String> artistIds = new ArrayList<>();
-    for (Object raw : items) {
-      Map<?, ?> track = (Map<?, ?>) raw;
-      List<?> artists = listValue(track, "artists");
+    try {
+      URI uri = URI.create("https://api.spotify.com/v1/search?type=track&limit=8&q=" + enc(query));
+      Map<?, ?> json = rest.get()
+          .uri(uri)
+          .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+          .retrieve()
+          .body(Map.class);
+      Map<?, ?> tracksObject = (Map<?, ?>) json.get("tracks");
+      List<?> items = tracksObject == null ? List.of() : listValue(tracksObject, "items");
+      List<TrackParts> parts = new ArrayList<>();
+      List<String> artistIds = new ArrayList<>();
+      for (Object raw : items) {
+        Map<?, ?> track = (Map<?, ?>) raw;
+        List<?> artists = listValue(track, "artists");
+        List<String> names = new ArrayList<>();
+        List<String> ids = new ArrayList<>();
+        for (Object artistRaw : artists) {
+          Map<?, ?> artist = (Map<?, ?>) artistRaw;
+          names.add(String.valueOf(artist.get("name")));
+          String id = String.valueOf(artist.get("id"));
+          ids.add(id);
+          artistIds.add(id);
+        }
+        parts.add(new TrackParts(
+            String.valueOf(track.get("uri")),
+            String.valueOf(track.get("name")),
+            String.join(", ", names),
+            ids,
+            albumArt(track)
+        ));
+      }
+      Map<String, List<String>> artistGenres = genresForArtists(accessToken, artistIds);
+      return parts.stream().map(track -> {
+        LinkedHashSet<String> allGenres = new LinkedHashSet<>();
+        track.artistIds().forEach(id -> allGenres.addAll(artistGenres.getOrDefault(id, List.of())));
+        List<String> spotifyGenres = List.copyOf(allGenres);
+        String genreLabel = spotifyGenres.isEmpty() ? "Spotify genre unavailable" : String.join(", ", spotifyGenres.subList(0, Math.min(2, spotifyGenres.size())));
+        return new TrackResult(track.id(), track.name(), track.artist(), genres.classify(spotifyGenres), genreLabel, spotifyGenres, track.albumArt());
+      }).toList();
+    } catch (RestClientResponseException error) {
+      throw spotifyApiException(error);
+    }
+  }
+
+  public CurrentTrack currentlyPlaying(String accessToken) {
+    try {
+      Map<?, ?> json = rest.get()
+          .uri("https://api.spotify.com/v1/me/player/currently-playing")
+          .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+          .retrieve()
+          .body(Map.class);
+      if (json == null || json.get("item") == null) return null;
+      Map<?, ?> item = (Map<?, ?>) json.get("item");
+      List<?> artists = listValue(item, "artists");
       List<String> names = new ArrayList<>();
       List<String> ids = new ArrayList<>();
       for (Object artistRaw : artists) {
         Map<?, ?> artist = (Map<?, ?>) artistRaw;
         names.add(String.valueOf(artist.get("name")));
-        String id = String.valueOf(artist.get("id"));
-        ids.add(id);
-        artistIds.add(id);
+        ids.add(String.valueOf(artist.get("id")));
       }
-      parts.add(new TrackParts(
-          String.valueOf(track.get("uri")),
-          String.valueOf(track.get("name")),
-          String.join(", ", names),
-          ids,
-          albumArt(track)
-      ));
-    }
-    Map<String, List<String>> artistGenres = genresForArtists(accessToken, artistIds);
-    return parts.stream().map(track -> {
-      LinkedHashSet<String> allGenres = new LinkedHashSet<>();
-      track.artistIds().forEach(id -> allGenres.addAll(artistGenres.getOrDefault(id, List.of())));
-      List<String> spotifyGenres = List.copyOf(allGenres);
+      String genreToken = catalogSearchConfigured() ? catalogToken() : accessToken;
+      List<String> spotifyGenres = ids.stream()
+          .map(id -> genresForArtists(genreToken, List.of(id)).getOrDefault(id, List.of()))
+          .flatMap(List::stream)
+          .distinct()
+          .toList();
       String genreLabel = spotifyGenres.isEmpty() ? "Spotify genre unavailable" : String.join(", ", spotifyGenres.subList(0, Math.min(2, spotifyGenres.size())));
-      return new TrackResult(track.id(), track.name(), track.artist(), genres.classify(spotifyGenres), genreLabel, spotifyGenres, track.albumArt());
-    }).toList();
-  }
-
-  public CurrentTrack currentlyPlaying(String accessToken) {
-    Map<?, ?> json = rest.get()
-        .uri("https://api.spotify.com/v1/me/player/currently-playing")
-        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-        .retrieve()
-        .body(Map.class);
-    if (json == null || json.get("item") == null) return null;
-    Map<?, ?> item = (Map<?, ?>) json.get("item");
-    List<?> artists = listValue(item, "artists");
-    List<String> names = new ArrayList<>();
-    List<String> ids = new ArrayList<>();
-    for (Object artistRaw : artists) {
-      Map<?, ?> artist = (Map<?, ?>) artistRaw;
-      names.add(String.valueOf(artist.get("name")));
-      ids.add(String.valueOf(artist.get("id")));
+      return new CurrentTrack(
+          String.valueOf(item.get("uri")),
+          String.valueOf(item.get("name")),
+          String.join(", ", names),
+          albumArt(item),
+          genres.classify(spotifyGenres),
+          genreLabel
+      );
+    } catch (RestClientResponseException error) {
+      throw spotifyApiException(error);
     }
-    List<String> spotifyGenres = ids.stream()
-        .map(id -> genresForArtists(accessToken, List.of(id)).getOrDefault(id, List.of()))
-        .flatMap(List::stream)
-        .distinct()
-        .toList();
-    String genreLabel = spotifyGenres.isEmpty() ? "Spotify genre unavailable" : String.join(", ", spotifyGenres.subList(0, Math.min(2, spotifyGenres.size())));
-    return new CurrentTrack(
-        String.valueOf(item.get("uri")),
-        String.valueOf(item.get("name")),
-        String.join(", ", names),
-        albumArt(item),
-        genres.classify(spotifyGenres),
-        genreLabel
-    );
   }
 
   public Map<String, List<String>> genresForArtists(String accessToken, List<String> artistIds) {
     Set<String> ids = new LinkedHashSet<>(artistIds.stream().filter(id -> id != null && !id.isBlank()).limit(20).toList());
     if (ids.isEmpty()) return Map.of();
-    Map<?, ?> json = rest.get()
-        .uri("https://api.spotify.com/v1/artists?ids=" + String.join(",", ids))
-        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-        .retrieve()
-        .body(Map.class);
-    List<?> artists = json == null ? List.of() : listValue(json, "artists");
-    java.util.HashMap<String, List<String>> result = new java.util.HashMap<>();
-    for (Object raw : artists) {
-      Map<?, ?> artist = (Map<?, ?>) raw;
-      result.put(String.valueOf(artist.get("id")), listValue(artist, "genres").stream().map(String::valueOf).toList());
+    try {
+      Map<?, ?> json = rest.get()
+          .uri("https://api.spotify.com/v1/artists?ids=" + String.join(",", ids))
+          .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+          .retrieve()
+          .body(Map.class);
+      List<?> artists = json == null ? List.of() : listValue(json, "artists");
+      java.util.HashMap<String, List<String>> result = new java.util.HashMap<>();
+      for (Object raw : artists) {
+        Map<?, ?> artist = (Map<?, ?>) raw;
+        result.put(String.valueOf(artist.get("id")), listValue(artist, "genres").stream().map(String::valueOf).toList());
+      }
+      return result;
+    } catch (RestClientResponseException error) {
+      if (error.getStatusCode().value() == 403) {
+        return Map.of();
+      }
+      throw spotifyApiException(error);
     }
-    return result;
   }
 
   private TokenResponse postToken(LinkedMultiValueMap<String, String> form) {
-    Map<?, ?> json = rest.post()
-        .uri("https://accounts.spotify.com/api/token")
-        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-        .body(form)
-        .retrieve()
-        .body(Map.class);
-    return new TokenResponse(
-        String.valueOf(json.get("access_token")),
-        json.get("refresh_token") == null ? null : String.valueOf(json.get("refresh_token")),
-        json.get("expires_in") instanceof Number number ? number.intValue() : 3600
-    );
+    try {
+      Map<?, ?> json = rest.post()
+          .uri("https://accounts.spotify.com/api/token")
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .body(form)
+          .retrieve()
+          .body(Map.class);
+      return new TokenResponse(
+          String.valueOf(json.get("access_token")),
+          json.get("refresh_token") == null ? null : String.valueOf(json.get("refresh_token")),
+          json.get("expires_in") instanceof Number number ? number.intValue() : 3600
+      );
+    } catch (RestClientResponseException error) {
+      throw spotifyApiException(error);
+    }
+  }
+
+  private synchronized String catalogToken() {
+    if (catalogAccessToken != null && catalogTokenExpiresAt.isAfter(Instant.now().plusSeconds(45))) {
+      return catalogAccessToken;
+    }
+    if (!catalogSearchConfigured()) {
+      throw new IllegalStateException("Spotify client credentials are not configured.");
+    }
+    LinkedMultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("grant_type", "client_credentials");
+    TokenResponse token = postClientCredentialsToken(form);
+    catalogAccessToken = token.accessToken();
+    catalogTokenExpiresAt = Instant.now().plusSeconds(Math.max(60, token.expiresIn()));
+    return catalogAccessToken;
+  }
+
+  private TokenResponse postClientCredentialsToken(LinkedMultiValueMap<String, String> form) {
+    try {
+      String credentials = properties.spotifyClientId() + ":" + properties.spotifyClientSecret();
+      Map<?, ?> json = rest.post()
+          .uri("https://accounts.spotify.com/api/token")
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .header(HttpHeaders.AUTHORIZATION, "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8)))
+          .body(form)
+          .retrieve()
+          .body(Map.class);
+      return new TokenResponse(
+          String.valueOf(json.get("access_token")),
+          null,
+          json.get("expires_in") instanceof Number number ? number.intValue() : 3600
+      );
+    } catch (RestClientResponseException error) {
+      throw spotifyApiException(error);
+    }
   }
 
   private String albumArt(Map<?, ?> track) {
@@ -235,10 +313,33 @@ public class SpotifyService {
     return URLEncoder.encode(value, StandardCharsets.UTF_8);
   }
 
+  private SpotifyApiException spotifyApiException(RestClientResponseException error) {
+    return new SpotifyApiException(error.getStatusCode().value(), error.getResponseBodyAsString(), error);
+  }
+
   private record TrackParts(String id, String name, String artist, List<String> artistIds, String albumArt) {}
   public record StartAuth(String authorizeUrl, String codeVerifier, String state) {}
   public record TokenResponse(String accessToken, String refreshToken, int expiresIn) {}
   public record SpotifyProfile(String id) {}
   public record TrackResult(String id, String name, String artist, String genre, String genre_label, List<String> spotify_genres, String album_art) {}
   public record CurrentTrack(String id, String name, String artist, String albumArt, String genre, String genreLabel) {}
+
+  public static class SpotifyApiException extends RuntimeException {
+    private final int statusCode;
+    private final String responseBody;
+
+    public SpotifyApiException(int statusCode, String responseBody, Throwable cause) {
+      super(responseBody, cause);
+      this.statusCode = statusCode;
+      this.responseBody = responseBody;
+    }
+
+    public int statusCode() {
+      return statusCode;
+    }
+
+    public String responseBody() {
+      return responseBody;
+    }
+  }
 }

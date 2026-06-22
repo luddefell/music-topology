@@ -16,3 +16,14 @@ soundscape:
   spotify-redirect-uri: ${SPOTIFY_REDIRECT_URI:http://localhost:5173/callback}
   jwt-secret: ${JWT_SECRET:local-development-secret-change-me}
   enable-auto-vote: ${ENABLE_AUTO_VOTE:true}
+  region-service-url: ${REGION_SERVICE_URL:http://127.0.0.1:8090}
+  ml-event-window-minutes: ${ML_EVENT_WINDOW_MINUTES:120}
+  ml-min-events-per-tile: ${ML_MIN_EVENTS_PER_TILE:1}
+  ml-music-similarity-threshold: ${ML_MUSIC_SIMILARITY_THRESHOLD:0.62}
+  ml-spatial-weight: ${ML_SPATIAL_WEIGHT:0.30}
+  ml-same-user-repeat-penalty: ${ML_SAME_USER_REPEAT_PENALTY:0.35}
+  ml-listening-weight: ${ML_LISTENING_WEIGHT:0.45}
+  ml-manual-vote-weight: ${ML_MANUAL_VOTE_WEIGHT:1.0}
+  ml-llm-descriptor-url: ${ML_LLM_DESCRIPTOR_URL:http://127.0.0.1:8090/tracks/enrich}
+  ml-llm-api-key: ${ML_LLM_API_KEY:${OPENAI_API_KEY:}}
+  ml-llm-model: ${ML_LLM_MODEL:${OPENAI_DESCRIPTOR_MODEL:gpt-4.1-mini}}

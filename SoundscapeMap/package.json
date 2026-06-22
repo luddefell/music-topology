@@ -8,10 +8,10 @@
     "packages/shared"
   ],
   "scripts": {
-    "dev": "npm-run-all --parallel dev:web dev:api dev:region",
+    "dev": "set -a; . ./.env; set +a; npm-run-all --parallel dev:web dev:api dev:region",
     "dev:web": "npm --workspace apps/web run dev",
-    "dev:api": "./mvnw -f services/api-spring/pom.xml spring-boot:run",
-    "dev:region": "python3 -m uvicorn services.region.app.main:app --reload --port 8090",
+    "dev:api": "set -a; . ./.env; set +a; ./mvnw -f services/api-spring/pom.xml spring-boot:run",
+    "dev:region": "set -a; . ./.env; set +a; .venv/bin/python -m uvicorn services.region.app.main:app --reload --port ${REGION_PORT:-8090}",
     "build": "npm --workspace packages/shared run build && ./mvnw -f services/api-spring/pom.xml -DskipTests package && npm --workspace apps/web run build",
     "lint": "npm --workspace packages/shared run lint && npm --workspace apps/web run lint",
     "test": "node --test packages/shared/test/*.test.mjs",

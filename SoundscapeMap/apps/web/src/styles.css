@@ -422,6 +422,45 @@ button {
   font-weight: 900;
 }
 
+.ml-region-card {
+  display: grid;
+  gap: 5px;
+  margin: 14px 0 18px;
+  padding: 12px;
+  border: 1px solid rgba(167, 243, 208, 0.22);
+  border-radius: 8px;
+  background: rgba(7, 13, 16, 0.42);
+}
+
+.ml-region-card span {
+  color: #a7f3d0;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.ml-region-card strong {
+  min-width: 0;
+  color: #f6fbf8;
+  font-size: 17px;
+  line-height: 1.15;
+}
+
+.ml-region-card small,
+.ml-region-card em,
+.ml-region-card code {
+  min-width: 0;
+  color: #b9c4bf;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.ml-region-card code {
+  color: #94a3b8;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
