@@ -38,7 +38,12 @@ public class RegionUpdateHub {
     Set<WebSocketSession> targets = subscriptions.getOrDefault(snapshot.region_id(), sessions);
     String payload;
     try {
-      payload = mapper.writeValueAsString(Map.of("type", "region_update", "snapshot", snapshot));
+      payload = mapper.writeValueAsString(Map.of(
+          "type", "region_update",
+          "region_id", snapshot.region_id(),
+          "h3_cell", snapshot.h3_cell(),
+          "snapshot", snapshot
+      ));
     } catch (IOException error) {
       throw new IllegalStateException("Could not serialize region update", error);
     }
